@@ -23,7 +23,7 @@ Blank PDF form -> Map fields -> Upload evidence -> Classify and extract
 - **Frontend:** React, TypeScript, Vite, and Lucide icons
 - **API:** FastAPI and Pydantic
 - **Database:** PostgreSQL with SQLAlchemy and Alembic migrations
-- **AI:** Meta Muse models through Baseten's OpenAI-compatible endpoint
+- **AI:** Meta Muse models through Baseten, with a Modal-hosted Muse model as an automatic fallback
 - **Documents:** PyMuPDF and Pillow for PDF inspection, rendering, and export
 - **Storage:** Private local storage for uploaded evidence and generated exports
 
@@ -97,6 +97,9 @@ The remaining variables already have usable defaults:
 | `BASETEN_BASE_URL` | OpenAI-compatible Baseten endpoint |
 | `MUSE_TEXT_MODEL` | Model used for classification, routing, and structured reasoning |
 | `MUSE_VISION_MODEL` | Model used to inspect form and evidence pages |
+| `MODAL_PROXY_TOKEN_ID` | Modal proxy token ID used only by the fallback client |
+| `MODAL_PROXY_TOKEN_SECRET` | Modal proxy token secret used only by the fallback client |
+| `MODAL_BASE_URL` | OpenAI-compatible Modal fallback endpoint |
 | `STORAGE_ROOT` | Private upload and export directory |
 | `MAX_UPLOAD_MB` | Maximum size of one uploaded file |
 | `MAX_PDF_PAGES` | Maximum accepted PDF page count |
@@ -161,6 +164,8 @@ HawkDoc does not create seed records or upload private sample documents. Judges 
 6. Missing evidence, ambiguous entity links, policy-controlled fields, and genuine conflicts remain visible for human review.
 
 Documents are treated as untrusted input in model prompts. Uploaded files remain under the private `storage/` directory, while page images are sent to the configured model endpoint during AI processing.
+
+Baseten remains the primary provider and keeps the configured `MUSE_TEXT_MODEL` and `MUSE_VISION_MODEL` unchanged. If a primary request fails or returns invalid structured output, HawkDoc retries that same task through the Modal endpoint with `meta-models/Muse-Spark-Open-816B-A42B`. If Modal credentials are absent, the primary error is returned normally.
 
 ## Validation
 

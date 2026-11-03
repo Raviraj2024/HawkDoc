@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.muse import FIELD_BATCH_SIZE, MuseClient, _normalize_extraction
+from app.services.muse import FIELD_BATCH_SIZE, MODAL_FALLBACK_MODEL, MuseClient, _normalize_extraction
 
 
 def test_normalize_extraction_accepts_model_schema_variations():
@@ -33,6 +33,20 @@ class FakeCompletions:
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
 
+class RecordingCompletions:
+    def __init__(self, content=None, error=None):
+        self.content = content
+        self.error = error
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.error:
+            raise self.error
+        message = SimpleNamespace(content=self.content)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+
 def client_with(content):
     client = object.__new__(MuseClient)
     client.client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions(content)))
@@ -47,6 +61,39 @@ def test_json_accepts_fenced_model_response():
 def test_json_extracts_object_from_explanatory_text():
     result = client_with('Result follows: {"fields": []}')._json("model", [])
     assert result == {"fields": []}
+
+
+def test_modal_fallback_uses_exact_model_and_preserves_primary_model():
+    primary = RecordingCompletions(error=RuntimeError("primary unavailable"))
+    modal = RecordingCompletions(content='{"result": "ok"}')
+    client = object.__new__(MuseClient)
+    client.client = SimpleNamespace(chat=SimpleNamespace(completions=primary))
+    client.modal_client = SimpleNamespace(chat=SimpleNamespace(completions=modal))
+
+    data, reasoning = client._json_with_reasoning(
+        "unchanged-baseten-model", [{"role": "user", "content": "Return JSON"}], "medium")
+
+    assert data == {"result": "ok"}
+    assert primary.calls[0]["model"] == "unchanged-baseten-model"
+    assert modal.calls[0]["model"] == MODAL_FALLBACK_MODEL
+    assert modal.calls[0]["extra_body"] == {"reasoning_effort": "medium"}
+    assert "reasoning_effort" not in modal.calls[0]
+    assert "Modal fallback used" in reasoning
+
+
+def test_modal_fallback_retries_schema_invalid_primary_response():
+    primary = RecordingCompletions(content='{"unexpected": true}')
+    modal = RecordingCompletions(content='{"required_key": "value"}')
+    client = object.__new__(MuseClient)
+    client.client = SimpleNamespace(chat=SimpleNamespace(completions=primary))
+    client.modal_client = SimpleNamespace(chat=SimpleNamespace(completions=modal))
+
+    data, _ = client._json_with_reasoning(
+        "baseten-model", [], validator=lambda payload: payload["required_key"])
+
+    assert data == {"required_key": "value"}
+    assert len(primary.calls) == 1
+    assert len(modal.calls) == 1
 
 
 def test_evidence_images_are_chunked_to_seven(monkeypatch):

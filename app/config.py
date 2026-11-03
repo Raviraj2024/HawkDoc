@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     baseten_base_url: str = "https://inference.baseten.co/v1"
     muse_text_model: str = "meta-models/muse-spark-open"
     muse_vision_model: str = "meta-models/muse-spark-open-1026"
+    modal_proxy_token_id: str = ""
+    modal_proxy_token_secret: str = ""
+    modal_base_url: str = "https://raviraj20022019--ep-muse-spark-open-816b-a42b-server.us-west.modal.direct/v1"
     storage_root: Path = Path("./storage")
     max_upload_mb: int = 25
     max_pdf_pages: int = 30
