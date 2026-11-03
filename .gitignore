@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/.pytest_cache/
+storage/uploads/
+storage/exports/
+realistic_personal_loan_test_pack/
+Complete_PRD.md
+account-opening-docs/
+tmp/
